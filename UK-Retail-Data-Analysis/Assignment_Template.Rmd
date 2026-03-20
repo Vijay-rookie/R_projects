@@ -1,0 +1,749 @@
+---
+title: "COMP7024 Assignment"
+author: "Vijay Lakshmi (ID - 22193558)"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  pdfindt_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse) 
+library(kableExtra)
+```
+By including this statement, we the authors of this work, verify that:
+
+- We hold a copy of this assignment that we can produce if the original is lost or
+damaged.
+- We hereby certify that no part of this assignment/product has been copied from
+any other student’s work or from any other source except where due acknowledgement
+is made in the assignment.
+- No part of this assignment/product has been written/produced for us by another
+person except where such collaboration has been authorised by the subject lecturer/
+tutor concerned.
+- We are aware that this work may be reproduced and submitted to plagiarism detection
+software programs for the purpose of detecting possible plagiarism (which
+may retain a copy on its database for future plagiarism checking).
+- We hereby certify that we have read and understand what the School of Computing,
+Engineering and Mathematics defines as minor and substantial breaches
+of misconduct as outlined in the learning guide for this unit.
+
+## Loading the data 
+
+```{r}
+# Loading orders data
+
+orders <- read.csv("project_orders.csv")  
+
+```
+
+```{r}
+# Loading product data
+
+product <- read.csv("project_product_info.csv")
+```
+
+## Data testing
+
+### Checking the dimensions: It should exactly match the numbers of rows in csv file, which shows that whole data has been completely loaded or not.
+
+```{r}
+dim(orders)
+dim(product)
+```
+* The dimensions are exactly equal to the number of rows in the csv file, hence data has been completely loaded.
+
+
+## Question 1: Data Preparation & Product Revenue Analysis
+
+
+### 1.1. Data cleaning - Removing cancelled Invoices
+
+* For revenue calculation accuracy it is important to remove cancelled invoices, cancelled invoices are identified by invoice number starting with letter "C".
+
+
+### Code
+
+* Cleaning data by removing cancelled Invoices
+
+```{r}
+# Data Cleaning
+
+orders_clean <- orders[substr(orders$InvoiceNo,1,1) !="C",] 
+
+```
+
+* Comparing the dimensions after removing cancelled invoices
+
+```{r}
+dim(orders)          #original orders                
+dim(orders_clean)   # cleaned orders  
+``` 
+
+### Interpretation
+
+- The original data set contain 541909 observations. After removing cancelled invoices we are left with 532621 observations. Hence, 9288 invoices are not included in the final revenue calculation.
+
+
+### 1.2. Total revenue for each product 
+
+- Revenue = Quantity X Unit Price
+
+```{r}
+orders_clean$Revenue <- orders_clean$Quantity * orders_clean$UnitPrice
+
+# using head function to check if revenue column appearing or not 
+
+head(orders_clean) 
+```
+
+```{r}
+# checking if any negative value still exist even after cleaning
+
+Negative_value_check <-sum(orders_clean$Revenue <0)
+Negative_value_check 
+```
+### Interpretation
+
+- here, it showing there are still 2 rows which have negative value, keeping them will lead to misleading revenue analysis. Therefore, we will remove them
+
+
+### Code
+
+```{r}
+# Removing Negative values
+
+orders_clean <- orders_clean[orders_clean$Revenue >0,]
+
+# checking again
+
+sum(orders_clean$Revenue <0)
+```
+
+### Interpretation
+
+- This shows that negative values are successfully removed.This ensures that revenue analysis reflects only the positive transactions.
+
+
+### 1.3. Using Inner Join for getting only StockCode Values
+
+```{r}
+## using inner join function
+
+library(dplyr)
+
+orders_final <- orders_clean %>%
+  inner_join(product, by = "StockCode")
+
+
+```
+
+
+```{r}
+# Using dim() to cross check
+
+dim(orders_clean)
+dim(orders_final)
+
+```
+
+### Interpretation**
+
+- The above results shows that we haven't lost any rows during inner join, that means product information has been successfully joined.
+
+
+
+### Code
+
+```{r}
+# Total Revenue
+
+product_revenue <- aggregate(Revenue~StockCode + Description,
+                             data = orders_final,
+                             sum)
+```
+
+```{r}
+# Sorting form highest orders
+
+product_revenue <- product_revenue[order(-product_revenue$Revenue),]
+
+```
+
+```{r}
+# Top 10 product
+
+Top10 <- head(product_revenue,10)
+Top10
+```
+
+### Interpretation
+
+- here, first we evaluate the product performance by aggregating total revenue at the product level. After that, we sort them in decreasing order and then identify the top 10 products.
+
+### Code
+
+```{r}
+# Visualization
+
+library(ggplot2)
+
+ggplot(Top10, aes(x = reorder(Description,Revenue) , y= Revenue))+ geom_bar(stat="identity", fill = "blue")+
+             coord_flip()+
+  labs(title = "Top 10 products by Revenue",
+       x = "product",
+       y = "Total Revenue")+
+           theme_minimal()        
+           
+```
+
+### Interpretation
+
+- for Visualization, library(ggplot2) has been used. In code reorder() function is used to control the visualization, so that they appear in a particular order. 
+
+- The bar chart shows the top 10 revenue generating after data cleaning. From the above bar graph we can see that, DOTCOM POSTAGE is generating the highest revenue followed by REGENCY CAKESTAND 3 TIER, PAPER CRAFT, LITTLE BIRDIE, etc., are coming out as strongest revenue generating items.
+
+- We see a noticeable drop after 3 products, showing that revenue generation is only limited to few items which include decorative, gift related, home decor and part items.
+
+
+### 1.4. Contribution of Top 10 products
+
+```{r}
+# Total Revenues
+
+total_revenue <- sum(orders_final$Revenue)
+total_revenue
+```
+
+
+
+
+```{r}
+# Contribution of top 10 products
+
+top10_revenue <- sum(Top10$Revenue)
+top10_revenue
+
+```
+
+
+
+```{r}
+# Percentage Contribution
+
+percentage_contribution <- (top10_revenue / total_revenue)*100
+
+percentage_contribution
+```
+### Interpretation
+
+- The total revenue is 10666685 while top 10 revenue is 1152444, contributing 10.8% of total revenue.
+
+- This shows that revenue is relatively diversified among many products, instead of concentrating to few number of products. 
+
+### 1.5. Bottom 10 products by Revenue
+
+```{r}
+# Bottom 10 Product
+
+bottom10 <- tail(product_revenue,10)
+bottom10
+```
+
+
+
+
+```{r}
+# Bottom 10 revenue
+
+bottom10_revenue <- sum(bottom10$Revenue)
+bottom10_revenue
+```
+
+
+
+
+```{r}
+# Visualization**
+
+ggplot(bottom10, 
+       aes(x = Revenue, y = reorder(Description, Revenue))) +
+  geom_point(size = 4, colour = "darkgreen") +
+  labs(title = "Bottom 10 Products by Revenue",
+       x = "Total Revenue",
+       y = "Product") +
+  theme_minimal()   
+```
+
+### Interpretation
+
+- The bottom 10 contribute negligible to total revenue and contribute almost nothing to overall business revenue. The company can either consider discontinue or promote these products.
+
+
+
+### 1.6. Top 3 products
+
+```{r}
+# Top 3 products
+
+top3 <- head(product_revenue,3)
+top3
+```
+
+
+
+
+```{r}
+# Revenue of Top 3
+
+top3_revenue <- sum(top3$Revenue)
+top3_revenue
+```
+
+
+
+```{r}
+# Percentage Contribution
+
+top3_percentage <- (top3_revenue /total_revenue)*100
+top3_percentage
+```
+
+
+
+
+```{r}
+
+
+# Visualization
+
+library(ggplot2)
+
+ggplot(top3, aes(x = reorder(Description,Revenue) , y= Revenue))+ geom_bar(stat="identity", fill = "pink")+
+             coord_flip()+
+  labs(title = "Top 3 products by Revenue",
+       x = "product",
+       y = "Total Revenue")+
+           theme_minimal() 
+```
+
+### Interpretataion
+
+- The top 3 products generate approximately 549203.1, representing 5.15% of total revenue. This indicates that revenue is not heavily concentrated among small number of products, indicating a diversified revenue structure.
+
+- This diversification reduces business risk, as they are not heavily dependent on single product. in addition, top performers include service related revenues to overall sales, showing the contribution by DOTCOM Postage.
+
+\hrule
+
+## Question 2: High Value Customer Analysis
+
+### 2.1. Each Customer total spending
+
+```{r}
+# total spending of each customer
+
+customer_spending <- aggregate(Revenue ~ CustomerID,
+                               data = orders_final,
+                               sum)
+
+```
+
+
+```{r}
+# Sorting 
+
+customer_spending <- customer_spending[order(-customer_spending$Revenue),]
+
+```
+
+
+```{r}
+#Viewing Top Customers
+
+head(customer_spending)
+```
+
+### Interpretation
+
+- Customer ID : 14646 comes out as the highest spending customer. The Revenue
+contributed by the this customer is 280206. The following highest spending customers are; Customer ID : 18102 , Customer ID : 17450 have revenue contribution, 259657.3 and 194550.8 respectively.
+
+- This shows, small group of customers are contributing significantly to total revenue. These customers should be given priority while deciding important policy like loyalty programs.
+
+- The revenue gap between the top customer and other customers shows the spending pattern behavior of them, it also highlight importance of customer segment in business decision making.
+
+
+
+### 2.2. Top 5 Customers
+
+### Code
+
+```{r}
+# Top 5 Highest spending Customers
+
+top5_Customers <- head(customer_spending, 5)
+top5_Customers
+```
+
+```{r}
+# Orders of Top 5 Customers
+
+top5_orders <- orders_final[orders_final$CustomerID %in% top5_Customers$CustomerID, ]
+
+dim(top5_orders)
+```
+
+```{r}
+# top 5 Customer's total quantity
+
+top5_quantity <- aggregate(Quantity ~ Description, data = top5_orders, sum)
+
+```
+
+
+```{r}
+# Sort 
+
+top5_quantity <- top5_quantity[order(-top5_quantity$Quantity), ]
+```
+
+
+```{r}
+# top 5  product 
+
+top5_quant<-head(top5_quantity, 5)
+top5_quant
+```
+
+```{r}
+# Visualization
+
+ggplot(top5_quant , aes(x=reorder(Description, Quantity), y= Quantity))+
+  geom_bar(stat = "identity", fill = "red")+
+  coord_flip()+
+  labs(title = "Top 5 product purchase of top 5 customers",
+       x = "Product",
+       y = "Total Quantity")+
+  theme_minimal()
+```
+
+### Interpretation 
+
+- Top-five highest spending customers shows a strong concentration in a small number of products. "PAPER CRAFT, LITTLE BIRDIE" comes out as dominating purchase with 80995 units being purchased, which is way higher than any other product.
+
+- Other products "CREAM HEART CARD HOLDER", "HEART OF WICKER SMALL", "WHITE HANGING HEART LIGHT HOLDER" presents a lower demand. Its shows clear preference of customers, highlighting that customers are not buying randomly.
+
+- The high demand of  "PAPER CRAFT , LITTLE BIRDIE" shows bulk purchasing behavior of customers towards this product. This pattern helps company to make customer segment strategies, offer discount and implement loyalty program.
+
+
+### 2.3. Business Implication
+
+- From the above analysis, we can say that small group of customers contribute more in total revenue. Customer id 14646 is generating 280000 revenue alone. It highlight the importance of retaining top customers.
+
+- Company should introduce programs that targeted to these customers, do personalized promotions and pricing strategies for these customers.
+
+- From the analyse, we also see that certain products have dominance and has high demand along with that they are also high risk products as any disruption in their supply can lead to high losses for company. Due to this they have to monitor the supply chain regularly.
+
+
+\hrule
+
+## Question 3: Global Market Analysis
+
+### 3.1. Total Revenue country wise
+
+```{r}
+
+# Total Revenue by country
+
+Country_revenue <- aggregate(Revenue~ Country, data =orders_final, sum)
+
+
+```
+
+```{r}
+# sort
+
+Country_revenue <- Country_revenue[order(-Country_revenue$Revenue),]
+```
+
+```{r}
+# Details
+
+head(Country_revenue)
+```
+
+
+### 3.2. Comparing Revenue among Countries
+
+```{r}
+# Visualization
+
+ggplot(Country_revenue, 
+       aes(x=reorder(Country, Revenue),
+           y = Revenue, fill = Revenue))+
+  geom_bar(stat="identity")+
+  coord_flip()+
+  labs(title = "Total Revenue by country",
+       x = "Country",
+       y = "Total Revenue")+
+  theme_minimal()
+```
+
+### Interpretation
+
+- From the above graph, it is clear that United Kingdom has generated highest revenue (i.e. 9025222.1) as compared to other countries and the difference between their revenue is very large. This shows that business is highly concentrated in UK.
+
+- Uk is followed by Netherlands, Germany, France, Australia, etc.,having revenue 285446.3, 283454.0, 228867.1, 209715.1, 138521.3 respectively.
+
+- The huge gap between Uk and other countries shows that it has strong domestic customers base while limited international exposure.
+
+- The company need to adopt a strategy where they can diversify the revenue generation sources and reduces risk. They need to expand their international market limits and make a string presence in potential market of growth like Germany, France, etc., In the long term it will generate more revenue and growth of the company and reduces geographic risk.
+
+
+### 3.3. Highest Revenue generated product in each country
+
+```{r}
+# Quantity by product and country
+
+country_product_quantity <- aggregate(Quantity ~Country+ Description,
+                                      data = orders_final,sum)
+```
+
+
+
+```{r}
+# Sort
+
+country_product_quantity<- country_product_quantity[order(country_product_quantity$Country,
+                                                          -country_product_quantity$Quantity),]
+```
+
+
+
+```{r}
+# Top Product of each country
+
+Top_product_Country <- country_product_quantity[!duplicated(country_product_quantity$Country),]
+
+
+```
+
+
+```{r}
+# Viewing the Top Countries
+
+head(Top_product_Country,10)
+```
+
+### Interpretation
+
+- The above table shows that different countries have different preferred product. Hence, there is no universal best -selling product. This also explains customer behavior which vary differently according to different region.
+
+- Considering that, the company should focus on different product according to different region depending on the local demand, taste and buying pattern. 
+
+
+
+\hrule
+
+
+## Question 4: Temporal Analysis and Trends
+
+### 4.1. Extracting Month and Year from the Invoice Date
+
+
+```{r}
+# Checking the format of the Date
+
+head(orders_clean$InvoiceDate, 5)
+
+```
+
+
+```{r}
+# Using the correct data set for extracting Invoice date
+
+orders_final<- orders_clean
+```
+
+
+
+```{r}
+
+
+# Convert Invoice Date correctly
+orders_final$InvoiceDate <- as.POSIXct(
+  orders_final$InvoiceDate,
+  format = "%d/%m/%Y %H:%M",
+  tz = "UTC"
+)
+
+```
+
+
+```{r}
+
+# Checking if Dates are converted in right format or not?
+
+head(orders_final$InvoiceDate, 5)
+sum(is.na(orders_final$InvoiceDate))   # should be 0
+
+
+```
+
+
+```{r}
+# Extracting Year and Month
+
+orders_final$Year  <- format(orders_final$InvoiceDate, "%Y")
+orders_final$Month <- format(orders_final$InvoiceDate, "%m")
+table(orders_final$Year)
+```
+
+```{r}
+# Monthly Revenue Table
+
+monthly_revenue <- aggregate(Revenue~ Year+Month, data =orders_final, sum)
+
+monthly_revenue <- monthly_revenue[order(monthly_revenue$Year, monthly_revenue$Month),]
+
+head(monthly_revenue,10)
+```
+
+
+```{r}
+# Highest Month
+
+monthly_revenue[which.max(monthly_revenue$Revenue),]
+```
+
+### 4.2. Month date column
+
+```{r}
+monthly_revenue$MonthDate <- as.Date(paste0(monthly_revenue$Year,"-",
+                                            monthly_revenue$Month,"-01"))
+
+head(monthly_revenue[,c("Year","Month","Revenue","MonthDate")])
+```
+
+### 4.3. Visualization 
+
+```{r}
+
+# Visualization
+
+ggplot(monthly_revenue, aes(x=MonthDate, y= Revenue))+
+  geom_line()+
+  geom_point()+
+  labs(title = "Monthly Revenue Trend",
+       x ="Month",
+       y= "Total Revenue")+
+  theme_minimal()
+
+
+
+```
+
+### Interpretation
+
+- The above picture shows Monthly Revenue trend, the figure shows that there is a sales decline during the February and March period. Then after April 2011, the sales start soaring again. The sales jump high in November 2011. But then again it drop sharply in December 2011.
+
+- From the above pattern, we can see that there is a seasonality in customer demand. It is high during the end of the year during the holidays and pre-Christmas period.
+
+
+
+### 4.4. Monthly product Revenue
+
+```{r}
+# merging orders_final with orders_final2 
+
+orders_final2 <- merge(orders_final, product, by= "StockCode")
+
+colnames(orders_final2)
+
+```
+
+
+```{r}
+# Monthly Product Revenue
+
+monthly_product_revenue <- aggregate(Revenue~ Year + Month + Description,
+                                     data = orders_final2, 
+                                     sum)
+
+head(monthly_product_revenue)
+
+```
+
+### 4.5. Bottom Products
+
+```{r}
+
+#  Identifying bottom products
+
+library(dplyr)
+
+bottom_products <- monthly_product_revenue %>%
+  arrange(Year, Month, Revenue) %>%
+  group_by(Year, Month) %>%
+  slice_head(n=5)
+
+head(bottom_products,10)
+```
+
+
+```{r}
+# Counting Repeating Items
+
+bottom_counts <- as.data.frame(table(bottom_products$Description))
+
+# Sort
+
+bottom_counts <- bottom_counts[order(-bottom_counts$Freq),]
+
+head(bottom_counts,10)
+
+```
+
+### Interpretation
+
+- From the above table, we can see that there are some certain products that are appearing consistently among the lowest selling items. 
+
+- Products like "Assorted Color Suction Cup Hook", "Pads To Match All Cushions", "Silicon Star Bulb Blue" has appeared 3 times, and other products like "Assorted Monkey Suction Cup Hook", "Blue Flock Glass Candleholder", etc., has appeared 2 times. 
+
+- The repeated appearance of these products in the bottom indicating their weak performance. This shows that they have low demand and has very limited customer approach. 
+
+- The company can consider various options for these products like; discontinuation of selling these products so that they can invest that money on popular products. Second, they can spend money on promotion of these products so that people get to know about these products and their sales might increase.
+Third; they can clear these products on discount, so that they can clear inventory or storage space and utilize that space for other products.
+
+\hrule 
+
+## 5. Conclusion
+
+- The above analysis provide insights related to performance of products, behavior of customers, revenue distribution, sales trends.
+
+- The products revenue analysis shows that revenue generation is mostly limited to few items. Customer level analysis shows that a small group of customers contribute more to total revenue, indicating the need for introducing strategy to target high value customers to retain them to longer period by introducing loyalty programs.
+
+- From the geographical perspective, we see that Uk has dominance there, on the other hand, other neighboring countries are contributing but a very small share. There is a huge potential for growing internationally. Under Temporal analysis, we see the trends of sales, which was high in November and them drop sharply in December. 
+
+- In conclusion, we can say that business shows strong seasonal behavior, identifying high value customers, sales that are limited to particular area and some popular products. Based on that we can say that the company need to introduce strategy which focused on customer retention, product promotion, seasonal planning and spreading internationally.
+
+\hrule 
+
+
+## 6. Git WorkFlow**
+
+- During the project, two branches are created, The following are the branches name: 
+ 1. fix-Q1-1.3.-interpretation
+ 2. fix-bottom-10-visualization
+ 
+- In "fix-Q1-1.3.-interpretation", I encountered a small mistake that is, I mistakenly add "/" at the end of interpretation. To rectify it, I made a branch and corrected this by removing it from there.
+
+- In "fix-bottom-10-visualization", at first I visualize bottom 10 by bar graph but then I thought of using dot plot, to create better and more correct picture.I made a branch and corrected this by adding new type of visualization. 
+- All changes are merge back to main after validation.
+
+
+------------------------------------------------------------------------
+
+I confirm that: - I understand all code submitted. - I can explain my
+solution if required.
