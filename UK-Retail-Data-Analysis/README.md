@@ -59,4 +59,3 @@ Certain products consistently underperform
 
 
 
-👉 This is EXACTLY what recruiters want
